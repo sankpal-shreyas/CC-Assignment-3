@@ -1,12 +1,18 @@
 version: 0.2
 
-# CodeBuild spec for the frontend pipeline (P2). Syncs the
-# front-end folder to the public S3 bucket (B1).
-# Expects env var: FRONTEND_BUCKET
+# CodeBuild spec for the frontend pipeline (P2).
+# Required CodeBuild env vars (set these in the CodeBuild project / GitHub secrets):
+#   FRONTEND_BUCKET, API_BASE, API_KEY, PHOTOS_BUCKET
 
 phases:
   build:
     commands:
+      - sed -e "s|REPLACE_ME_API_BASE|$API_BASE|g"
+            -e "s|REPLACE_ME_API_KEY|$API_KEY|g"
+            -e "s|REPLACE_ME_PHOTOS_BUCKET|$PHOTOS_BUCKET|g"
+            front-end/config.js > /tmp/config_live.js
+      - cp /tmp/config_live.js front-end/config.js
       - aws s3 sync front-end/ "s3://$FRONTEND_BUCKET/" --delete
           --exclude "buildspec.yml"
           --exclude "*.md"
+          --exclude "apigClient/*"

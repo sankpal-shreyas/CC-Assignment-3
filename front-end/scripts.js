@@ -1,8 +1,3 @@
-// Talks to the API Gateway endpoints set up in assignment step 4.
-// We use fetch() directly so the page works without bundling the
-// generated JS SDK. The SDK is still generated and committed under
-// /front-end/apigClient/ to satisfy step 4.e.
-
 const cfg = window.PHOTO_APP_CONFIG || {};
 
 const $ = (id) => document.getElementById(id);
@@ -16,25 +11,28 @@ async function search(q) {
   const url = `${cfg.API_BASE}/search?q=${encodeURIComponent(q)}`;
   const res = await fetch(url, {
     method: "GET",
-    headers: { "x-api-key": cfg.API_KEY },
+    mode: "cors",
+    headers: {
+      "x-api-key": cfg.API_KEY,
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
   });
   if (!res.ok) throw new Error(`search failed: ${res.status}`);
   return res.json();
 }
 
 async function upload(file, customLabels) {
-  // PUT directly to the API Gateway S3 proxy. The API maps
-  // /photos/{bucket}/{key} -> S3 PutObject and forwards the
-  // x-amz-meta-customLabels header through to the object.
   const safeKey = encodeURIComponent(file.name);
   const url = `${cfg.API_BASE}/photos/${cfg.PHOTOS_BUCKET}/${safeKey}`;
   const headers = {
     "x-api-key": cfg.API_KEY,
     "Content-Type": file.type || "application/octet-stream",
+    "Access-Control-Allow-Origin": "*",
   };
   if (customLabels) headers["x-amz-meta-customLabels"] = customLabels;
 
-  const res = await fetch(url, { method: "PUT", headers, body: file });
+  const res = await fetch(url, { method: "PUT", mode: "cors", headers, body: file });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`upload failed: ${res.status} ${text}`);
