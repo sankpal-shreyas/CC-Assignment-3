@@ -1,0 +1,12 @@
+version: 0.2
+
+# CodeBuild spec for the frontend pipeline (P2). Syncs the
+# front-end folder to the public S3 bucket (B1).
+# Expects env var: FRONTEND_BUCKET
+
+phases:
+  build:
+    commands:
+      - aws s3 sync front-end/ "s3://$FRONTEND_BUCKET/" --delete
+          --exclude "buildspec.yml"
+          --exclude "*.md"

@@ -1,0 +1,26 @@
+{photoType1}
+{photoType1} and {photoType2}
+{photoType1} {photoType2}
+show me {photoType1}
+show me {photoType1} and {photoType2}
+show me photos of {photoType1}
+show me photos of {photoType1} and {photoType2}
+show me photos with {photoType1}
+show me photos with {photoType1} and {photoType2}
+show me photos with {photoType1} and {photoType2} in them
+find {photoType1}
+find {photoType1} and {photoType2}
+find photos of {photoType1}
+find photos of {photoType1} and {photoType2}
+find pictures of {photoType1}
+find pictures of {photoType1} and {photoType2}
+get me {photoType1}
+get me {photoType1} and {photoType2}
+photos of {photoType1}
+photos of {photoType1} and {photoType2}
+pictures of {photoType1}
+pictures of {photoType1} and {photoType2}
+i want to see {photoType1}
+i want to see {photoType1} and {photoType2}
+search for {photoType1}
+search for {photoType1} and {photoType2}

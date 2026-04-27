@@ -1,0 +1,100 @@
+swagger: "2.0"
+info:
+  title: AI Photo Search
+  description: Upload photos to S3 and search them by content via Lex + OpenSearch.
+  version: "1.0.0"
+schemes: [https]
+basePath: /prod
+consumes: [application/json]
+produces: [application/json]
+
+paths:
+
+  /search:
+    get:
+      operationId: searchPhotos
+      summary: Search photos by natural-language query
+      parameters:
+        - in: query
+          name: q
+          type: string
+          required: true
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    url:    { type: string }
+                    labels: { type: array, items: { type: string } }
+        "500": { description: server error }
+      security:
+        - api_key: []
+    options:
+      summary: CORS preflight
+      responses:
+        "200":
+          description: ok
+          headers:
+            Access-Control-Allow-Origin:  { type: string }
+            Access-Control-Allow-Methods: { type: string }
+            Access-Control-Allow-Headers: { type: string }
+
+  /photos/{bucket}/{key}:
+    put:
+      operationId: uploadPhoto
+      summary: Upload a photo to S3 via the API Gateway S3 proxy
+      consumes: ["*/*"]
+      parameters:
+        - in: path
+          name: bucket
+          required: true
+          type: string
+        - in: path
+          name: key
+          required: true
+          type: string
+        - in: header
+          name: Content-Type
+          required: false
+          type: string
+        - in: header
+          name: x-amz-meta-customLabels
+          required: false
+          type: string
+          description: Comma-separated custom labels appended to Rekognition's labels.
+      responses:
+        "200": { description: ok }
+        "403": { description: forbidden }
+        "500": { description: server error }
+      security:
+        - api_key: []
+    options:
+      summary: CORS preflight
+      parameters:
+        - in: path
+          name: bucket
+          required: true
+          type: string
+        - in: path
+          name: key
+          required: true
+          type: string
+      responses:
+        "200":
+          description: ok
+          headers:
+            Access-Control-Allow-Origin:  { type: string }
+            Access-Control-Allow-Methods: { type: string }
+            Access-Control-Allow-Headers: { type: string }
+
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header

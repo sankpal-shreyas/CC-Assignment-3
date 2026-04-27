@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AI photo search - minimum infra (assignment 7.b). Spins up the two S3 buckets,
+  the two lambda functions, and an API Gateway that wires them together.
+  OpenSearch, Lex and CodePipeline are intentionally out of scope here - they
+  are stood up in the console and CodePipeline pushes real code into the
+  lambdas after this stack creates them.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ai-photo-search
+    Description: Used as a prefix for bucket and resource names.
+
+Resources:
+
+  # --- S3 buckets ---------------------------------------------------------
+
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-photos-${AWS::AccountId}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: ["*"]
+            AllowedMethods: [GET, PUT, POST, HEAD]
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${FrontendBucket}/*"
+
+  # --- Lambda execution role ---------------------------------------------
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonRekognitionReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      Policies:
+        - PolicyName: lex-and-es
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lex:RecognizeText
+                  - lex:RecognizeUtterance
+                Resource: "*"
+              - Effect: Allow
+                Action: ["es:ESHttp*"]
+                Resource: "*"
+
+  # --- Lambdas -----------------------------------------------------------
+  # Stub code only. CodePipeline (P1) pushes the real code in
+  # /lambda-functions/<name>/ over the top of these after the stack is up.
+
+  IndexPhotosFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-index-photos"
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              # placeholder - real code is deployed by CodePipeline
+              print("index-photos stub invoked", event)
+              return {"statusCode": 200}
+
+  SearchPhotosFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-search-photos"
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          def handler(event, context):
+              # placeholder - real code is deployed by CodePipeline
+              return {
+                  "statusCode": 200,
+                  "headers": {"Access-Control-Allow-Origin": "*"},
+                  "body": json.dumps({"results": []}),
+              }
+
+  IndexPhotosInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IndexPhotosFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt PhotosBucket.Arn
+
+  # --- API Gateway -------------------------------------------------------
+
+  Api:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${ProjectName}-api"
+      EndpointConfiguration: { Types: [REGIONAL] }
+      BinaryMediaTypes: ["*/*"]
+
+  SearchResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: search
+
+  SearchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref SearchResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SearchPhotosFunction.Arn}/invocations"
+
+  SearchInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SearchPhotosFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/GET/search"
+
+  PhotosResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: photos
+
+  # In the real setup this is configured as an S3 service proxy in the
+  # console (see other-scripts/apigateway/s3-proxy-mapping.md). For the CFN
+  # smoke test we just stub PUT /photos as a mock so the stack can stand up.
+  PhotosMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref PhotosResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+      MethodResponses:
+        - StatusCode: 200
+
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - SearchMethod
+      - PhotosMethod
+    Properties:
+      RestApiId: !Ref Api
+
+  Stage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref Api
+      DeploymentId: !Ref Deployment
+      StageName: prod
+
+Outputs:
+  FrontendURL:
+    Description: Public URL of the static site
+    Value: !GetAtt FrontendBucket.WebsiteURL
+  PhotosBucketName:
+    Value: !Ref PhotosBucket
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  ApiInvokeURL:
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  IndexPhotosFunctionName:
+    Value: !Ref IndexPhotosFunction
+  SearchPhotosFunctionName:
+    Value: !Ref SearchPhotosFunction

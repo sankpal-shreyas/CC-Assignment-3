@@ -1,0 +1,27 @@
+version: 0.2
+
+# CodeBuild spec for index-photos. Builds the lambda zip from this folder
+# and pushes it to AWS Lambda. Expects env vars:
+#   FUNCTION_NAME (e.g. index-photos)
+#   AWS_DEFAULT_REGION
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+  build:
+    commands:
+      - cd lambda-functions/index-photos
+      - rm -rf build && mkdir build
+      - pip install -r requirements.txt -t build/
+      - cp lambda_function.py build/
+      - cd build && zip -rq ../function.zip . && cd ..
+      - aws lambda update-function-code
+          --function-name "$FUNCTION_NAME"
+          --zip-file fileb://function.zip
+          --region "$AWS_DEFAULT_REGION"
+
+artifacts:
+  files:
+    - lambda-functions/index-photos/function.zip
+  discard-paths: yes
