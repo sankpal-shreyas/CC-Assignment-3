@@ -15,7 +15,6 @@ async function search(q) {
     headers: {
       "x-api-key": cfg.API_KEY,
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
     },
   });
   if (!res.ok) throw new Error(`search failed: ${res.status}`);
@@ -28,7 +27,6 @@ async function upload(file, customLabels) {
   const headers = {
     "x-api-key": cfg.API_KEY,
     "Content-Type": file.type || "application/octet-stream",
-    "Access-Control-Allow-Origin": "*",
   };
   if (customLabels) headers["x-amz-meta-customLabels"] = customLabels;
 
