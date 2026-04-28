@@ -8,7 +8,7 @@
       "objectKey":        { "type": "keyword" },
       "bucket":           { "type": "keyword" },
       "createdTimestamp": { "type": "date" },
-      "labels":           { "type": "keyword" }
+      "labels":           { "type": "text", "analyzer": "english" }
     }
   }
 }

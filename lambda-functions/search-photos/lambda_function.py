@@ -52,11 +52,20 @@ def _response(body, status=200):
     }
 
 
+_ARTICLES = {"a", "an", "the"}
+
+
 def _slot_value(slot):
     if not slot:
         return None
     val = slot.get("value") or {}
     return val.get("interpretedValue") or val.get("originalValue")
+
+
+def _clean_keyword(phrase):
+    # Lex can return "a dog" or "an elephant" as a slot value; strip articles
+    # and split so each word is queried individually.
+    return [w for w in phrase.lower().split() if w and w not in _ARTICLES]
 
 
 def _keywords_from_lex(q):
@@ -73,7 +82,7 @@ def _keywords_from_lex(q):
     for slot in slots.values():
         v = _slot_value(slot)
         if v:
-            out.append(v.strip().lower())
+            out.extend(_clean_keyword(v))
     return out
 
 
@@ -101,7 +110,14 @@ def lambda_handler(event, context):
 
     body = {
         "size": 50,
-        "query": {"terms": {"labels": keywords}},
+        "query": {
+            "match": {
+                "labels": {
+                    "query": " ".join(keywords),
+                    "operator": "or",
+                }
+            }
+        },
     }
     hits = es.search(index=ES_INDEX, body=body).get("hits", {}).get("hits", [])
 
